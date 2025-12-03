@@ -1,0 +1,32 @@
+{
+  "name": "devspirit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leticiakkkkkk/DevSpirit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Leticiakkkkkk/DevSpirit/issues"
+  },
+  "homepage": "https://github.com/Leticiakkkkkk/DevSpirit#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prisma": "^7.0.1"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.0.1"
+  }
+}
