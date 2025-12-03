@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  githubId  String   @unique
+  username  String
+  createdAt DateTime @default(now())
+  pets      Pet[]
+}
+
+model Pet {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  level        Int      @default(1)
+  xp           Int      @default(0)
+  happiness    Int      @default(100)
+  lastActiveAt DateTime?
+  createdAt    DateTime @default(now())
+
+  user        User              @relation(fields: [userId], references: [id])
+  activities  CommitActivity[]
+}
+
+model CommitActivity {
+  id        String   @id @default(uuid())
+  petId     String
+  repo      String
+  commitAt  DateTime
+  type      String
+  createdAt DateTime @default(now())
+
+  pet Pet @relation(fields: [petId], references: [id])
+}
