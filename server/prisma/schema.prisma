@@ -1,40 +1,57 @@
 generator client {
-  provider = "prisma-client"
+  provider   = "prisma-client-js"
+  engineType = "library" 
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id        String   @id @default(uuid())
   githubId  String   @unique
   username  String
+  avatarUrl String?
+  name      String?
+  accessToken String?
+  pet       Pet?
   createdAt DateTime @default(now())
-  pets      Pet[]
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
 }
 
 model Pet {
-  id           String   @id @default(uuid())
-  userId       String
-  name         String
-  level        Int      @default(1)
-  xp           Int      @default(0)
-  happiness    Int      @default(100)
-  lastActiveAt DateTime?
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  name          String   @default("Unnamed Spirit")
+  level         Int      @default(1)
+  xp            Int      @default(0)
+  happiness     Int      @default(100)
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  lastCommitAt  DateTime?
+  lastInteractionAt DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  activities    CommitActivity[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user        User              @relation(fields: [userId], references: [id])
-  activities  CommitActivity[]
+  @@map("pets")
 }
 
 model CommitActivity {
   id        String   @id @default(uuid())
   petId     String
-  repo      String
-  commitAt  DateTime
-  type      String
+  repoName  String
+  commitHash String
+  message   String
+  commitUrl String?
+  committedAt DateTime
+  xpEarned  Int      @default(0)
+  pet       Pet      @relation(fields: [petId], references: [id])
   createdAt DateTime @default(now())
 
-  pet Pet @relation(fields: [petId], references: [id])
+  @@map("commit_activities")
 }
