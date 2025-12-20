@@ -1,86 +1,92 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
-import jwt from 'jsonwebtoken';
+import { GithubService } from '../services/GithubService';
 
 const router = Router();
 
-router.post('/login', async (req, res) => {
-  const { code } = req.body;
-
-  if (!code) {
-    return res.status(400).json({ error: 'GitHub code is required' });
-  }
-
+router.post('/login', async (req: Request, res: Response): Promise<any> => {
   try {
-    // Troca code por token no GitHub
-    const { data } = await axios.post(
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Código do GitHub é obrigatório.' });
+    }
+
+    const accessTokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
+      null,
       {
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
-        code,
-      },
-      {
-        headers: {
-          Accept: 'application/json',
+        params: {
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code,
         },
+        headers: { Accept: 'application/json' },
       }
     );
 
-    if (data.error || !data.access_token) {
-      return res.status(400).json({ error: 'GitHub authentication failed' });
+    const { access_token } = accessTokenResponse.data;
+
+    if (!access_token) {
+      return res.status(400).json({ error: 'Falha ao obter token do GitHub.' });
     }
 
-    const accessToken = data.access_token;
-
-    // Pega dados do user
     const userResponse = await axios.get('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${access_token}` },
     });
 
-    const gitHubUser = userResponse.data;
+    const githubUser = userResponse.data;
+    const githubService = new GithubService();
+    const rpgStats = await githubService.calculateRPGStats(access_token, githubUser.login);
 
-    // Cria ou atualiza usuário + Cria Pet se for novo
-    let user = await prisma.user.upsert({
-      where: { githubId: String(gitHubUser.id) },
-      update: {
-        avatarUrl: gitHubUser.avatar_url,
-        username: gitHubUser.login,
-        name: gitHubUser.name,
-        accessToken: accessToken,
-      },
-      create: {
-        githubId: String(gitHubUser.id),
-        username: gitHubUser.login,
-        avatarUrl: gitHubUser.avatar_url,
-        name: gitHubUser.name,
-        accessToken: accessToken,
-        pet: {
-          create: {
-            name: "Ovo Misterioso",
-            level: 1,
-            xp: 0
+    let user = await prisma.user.findUnique({
+      where: { githubId: String(githubUser.id) }
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          githubId: String(githubUser.id),
+          username: githubUser.login,
+          name: githubUser.name || githubUser.login,
+          avatarUrl: githubUser.avatar_url,
+          rpgClass: rpgStats.classType,
+          githubStats: JSON.stringify(rpgStats),
+          pet: {
+            create: {
+              name: "Ovo Misterioso",
+              level: 1,
+              xp: 0,
+              isMegaRare: Math.random() > 0.95 
+            }
           }
         }
-      },
+      });
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          avatarUrl: githubUser.avatar_url,
+          rpgClass: rpgStats.classType,
+          githubStats: JSON.stringify(rpgStats),
+          lastSyncedAt: new Date()
+        }
+      });
+    }
+
+    const userWithPet = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { pet: true }
     });
 
-    // Gera nosso token JWT
-    const token = jwt.sign(
-      { userId: user.id, username: user.username },
-      process.env.JWT_SECRET as string,
-      { expiresIn: '7d' }
-    );
-
-    return res.json({ token, user });
+    return res.json({ user: userWithPet, token: access_token });
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Erro no login:', error);
+    return res.status(500).json({ error: 'Erro interno no servidor.' });
   }
 });
 
-export default router;
+// AQUI ESTAVA O PROBLEMA: Exportação nomeada explícita
+export { router as authRoutes };

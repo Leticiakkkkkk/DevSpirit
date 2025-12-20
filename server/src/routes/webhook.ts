@@ -16,7 +16,7 @@ router.post('/github', async (req, res) => {
     console.log(`🔔 Evento recebido! ${githubUsername} fez ${commits.length} commits.`);
 
     // para localizar o dono do pet no bd
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { username: githubUsername },
       include: { pet: true }
     });

@@ -1,57 +1,75 @@
+// server/prisma/schema.prisma
+
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "library" 
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite" 
   url      = env("DATABASE_URL")
 }
 
 model User {
   id        String   @id @default(uuid())
   githubId  String   @unique
-  username  String
-  avatarUrl String?
-  name      String?
-  accessToken String?
-  pet       Pet?
+  username  String   @unique
+  name      String
+  avatarUrl String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@map("users")
+
+  // RELACIONAMENTOS 
+
+  pet            Pet?
+  battlesAsHero  Battle[] @relation("HeroBattles")
+  battlesAsRival Battle[] @relation("RivalBattles")
+
+
+  //  RPG STATS (Persistidos)
+
+  githubStats    String?  @default("{}") // JSON string: { totalCommits, languages, bestLang }
+  rpgClass       String   @default("Novice") // "SPECIALIST" ou "POLYGLOT"
+  lastSyncedAt   DateTime @default(now())
+
+  //  RANKING (Competitivo) 
+
+  battlesWon  Int @default(0)
+  battlesLost Int @default(0)
+  rankScore   Int @default(0) // to leaderbook
+
+  @@index([rankScore(sort: Desc)])
 }
 
 model Pet {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  name          String   @default("Unnamed Spirit")
-  level         Int      @default(1)
-  xp            Int      @default(0)
-  happiness     Int      @default(100)
-  currentStreak Int      @default(0)
-  longestStreak Int      @default(0)
-  lastCommitAt  DateTime?
-  lastInteractionAt DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id])
-  activities    CommitActivity[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(uuid())
+  level     Int      @default(1)
+  xp        Int      @default(0)
+  name      String?
+  
+  // Customização Visual
+  isMegaRare Boolean @default(false)
+  
+  // Relacionamento
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("pets")
+  updatedAt DateTime @updatedAt
 }
 
-model CommitActivity {
+model Battle {
   id        String   @id @default(uuid())
-  petId     String
-  repoName  String
-  commitHash String
-  message   String
-  commitUrl String?
-  committedAt DateTime
-  xpEarned  Int      @default(0)
-  pet       Pet      @relation(fields: [petId], references: [id])
   createdAt DateTime @default(now())
 
-  @@map("commit_activities")
+  // Quem lutou?
+
+  heroId    String
+  hero      User     @relation("HeroBattles", fields: [heroId], references: [id])
+  
+  rivalId   String
+  rival     User     @relation("RivalBattles", fields: [rivalId], references: [id])
+
+  // Resultado
+
+  winnerId  String?  // ID de quem ganhou (empate se for null)
+  log       String 
 }
