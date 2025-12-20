@@ -4,22 +4,24 @@ interface RPGStats {
   classType: "SPECIALIST" | "POLYGLOT";
   hp: number;
   attributes: any;
+}
+
 export class GithubService {
   
   // Analisa o perfil e retorna os Stats de RPG
   async calculateRPGStats(accessToken: string, username: string): Promise<RPGStats> {
     try {
-      // 1. Buscar dados básicos do user
+      // 1. Buscar dados básicos do usuário
       const { data: user } = await axios.get('https://api.github.com/user', {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
-      // 2. Buscar repositórios (limited 50)
+      // 2. Buscar repositórios (limitado a 50 para não estourar rate limit)
       const { data: repos } = await axios.get('https://api.github.com/user/repos?sort=updated&per_page=50', {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
-      // --- CÁLCULO DE CLASSE (Lógica de Maestria) ---
+      // --- CÁLCULO DE CLASSE ---
       const languageCounts: Record<string, number> = {};
       let totalReposWithLang = 0;
 
@@ -30,7 +32,6 @@ export class GithubService {
         }
       });
 
-      // Descobre a linguagem mais usada
       let topLang = "";
       let maxCount = 0;
 
@@ -41,13 +42,10 @@ export class GithubService {
         }
       });
 
-      // Se 60% ou mais dos repositórios são da mesma linguagem = SPECIALIST
-      // Caso contrário = POLYGLOT
       const dominance = totalReposWithLang > 0 ? (maxCount / totalReposWithLang) : 0;
       const classType = dominance >= 0.6 ? "SPECIALIST" : "POLYGLOT";
 
-      // --- CÁLCULO DE HP (Vida) ---
-      // Fórmula: (Repos * 10) + (Seguidores * 5) + (Dias de conta / 10)
+      // --- CÁLCULO DE HP ---
       const daysSinceCreation = Math.floor((new Date().getTime() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24));
       const hp = (user.public_repos * 10) + (user.followers * 5) + Math.floor(daysSinceCreation / 10);
 
