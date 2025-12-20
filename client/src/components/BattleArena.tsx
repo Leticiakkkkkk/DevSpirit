@@ -1,150 +1,170 @@
 import { useState } from 'react';
-import { motion} from 'framer-motion';
-import { Sword, Zap } from 'lucide-react';
-import { SpiritPet } from './SpiritPet';
+import axios from 'axios';
+import { motion } from 'framer-motion';
+import { X, Swords, Zap } from 'lucide-react';
 
-// Tipagem Simples para Batalha
-interface BattleUser {
-  name: string;
-  avatar: string;
-  level: number;
-  stats: {
-    hp: number;
-    atk: number;
-    classType: "SPECIALIST" | "POLYGLOT"; 
-  }
+// Tipagem das props recebidas do App.tsx
+interface BattleArenaProps {
+  myUser: any;
+  rivalUser: any; // <--- AGORA ESTAMOS RECEBENDO O RIVAL CORRETAMENTE
+  onClose: () => void;
 }
 
-export function BattleArena({ myUser, onClose }: { myUser : any, onClose: () => void }) {
-  const [battleLog, setBattleLog] = useState<string[]>([]);
+export function BattleArena({ myUser, rivalUser, onClose }: BattleArenaProps) {
+  const [displayLogs, setDisplayLogs] = useState<any[]>([]);
   const [winner, setWinner] = useState<string | null>(null);
-  
-  // 1. Simulação do Oponente (Rival)
-  const rival: BattleUser = {
-    name: "Dark_Dev_99",
-    avatar: "https://github.com/shadcn.png",
-    level: myUser.pet.level + 2, // Um pouco mais forte para desafiar
-    stats: { hp: 100 + (myUser.pet.level * 10), atk: 15, classType: "SPECIALIST" }
-  };
+  const [isBattling, setIsBattling] = useState(false);
 
-  // 2. Definindo os Stats do Usuário (Baseado no GitHub real seria calculado no back)
-  const myStats: BattleUser = {
-    name: myUser.name,
-    avatar: myUser.avatarUrl,
-    level: myUser.pet.level,
-    stats: { 
-      hp: 100 + (myUser.pet.level * 10), 
-      atk: 12, 
-      classType: "POLYGLOT"
-    }
-  };
+  // Vida Visual (Começa em 100%)
+  const [heroHp, setHeroHp] = useState(100);
+  const [rivalHp, setRivalHp] = useState(100);
 
-  const [myHp, setMyHp] = useState(myStats.stats.hp);
-  const [rivalHp, setRivalHp] = useState(rival.stats.hp);
+  // Função que inicia a batalha REAL no servidor
+  const startBattle = async () => {
+    setIsBattling(true);
+    try {
+      // 1. Chama o Backend Real
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/battle/challenge`, {
+        heroId: myUser.id,
+        rivalId: rivalUser.id // <--- Manda o ID da laetit1a, não do bot
+      });
 
-  // Lógica de Turno
-  const playTurn = () => {
-    if (winner) return;
-
-    // Turno do Jogador
-    let damage = myStats.stats.atk + Math.floor(Math.random() * 5);
-    let isCrit = Math.random() > 0.8; 
-
-    setRivalHp(prev => Math.max(0, prev - damage));
-    setBattleLog(prev => [`${myStats.name} causou ${damage} de dano! ${isCrit ? 'CRITICAL!' : ''}`, ...prev]);
-
-    if (rivalHp - damage <= 0) {
-      setWinner(myStats.name);
-      return;
-    }
-
-    // Turno do Rival (Com delay para drama)
-    setTimeout(() => {
-      let rivalDmg = rival.stats.atk;
-      if (rival.stats.classType === "SPECIALIST" && Math.random() > 0.6) {
-         rivalDmg *= 2.5; 
-         setBattleLog(prev => [`⚠️ ${rival.name} usou DEADLY AIM! Dano massivo!`, ...prev]);
-      }
+      // 2. Recebe o resultado da luta
+      const { logs: battleLogs, winnerId } = response.data;
+      setWinner(winnerId);
       
-      setMyHp(prev => Math.max(0, prev - rivalDmg));
-      setBattleLog(prev => [`${rival.name} atacou com ${rivalDmg} de dano.`, ...prev]);
+      // 3. Toca a animação (Replay)
+      let currentTurn = 0;
       
-      if (myHp - rivalDmg <= 0) setWinner(rival.name);
-    }, 800);
+      const interval = setInterval(() => {
+        if (currentTurn >= battleLogs.length) {
+          clearInterval(interval);
+          setIsBattling(false);
+          return;
+        }
+
+        const log = battleLogs[currentTurn];
+        
+        setDisplayLogs(prev => [...prev, log]);
+        
+        // Atualiza as barras de vida
+        if (log.remainingHp !== undefined) {
+           const damage = log.damage || 0;
+           if (log.attacker === myUser.username) {
+             setRivalHp(prev => Math.max(0, prev - damage)); 
+           } else {
+             setHeroHp(prev => Math.max(0, prev - damage));
+           }
+        }
+
+        currentTurn++;
+      }, 800); 
+
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao conectar na Arena. Verifique o servidor.");
+      setIsBattling(false);
+      onClose();
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl relative">
         
-        {/* Header da Arena */}
+        {/* Header */}
         <div className="bg-zinc-950 p-4 border-b border-zinc-800 flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Sword className="text-red-500" /> BATTLE ARENA
+            <Swords className="text-red-500" /> BATTLE ARENA
           </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white">ESC</button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X /></button>
         </div>
 
         {/* O Palco */}
-        <div className="relative p-8 flex justify-between items-center bg-[url('https://grainy-gradients.vercel.app/noise.svg')]">
+        <div className="relative p-8 flex justify-between items-center bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-90">
           
-          {/* Jogador (Esquerda) */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-               <SpiritPet level={myStats.level} xp={50} size="md" />
-               {myHp < 30 && <div className="absolute inset-0 bg-red-500/20 animate-pulse rounded-full" />}
-            </div>
-            <div className="text-center">
-               <h3 className="font-bold text-white">{myStats.name}</h3>
-               <div className="w-32 h-2 bg-zinc-800 rounded-full mt-1 overflow-hidden">
-                 <motion.div animate={{ width: `${(myHp / myStats.stats.hp) * 100}%` }} className="h-full bg-emerald-500" />
+          {/* VOCÊ (ESQUERDA) */}
+          <div className="flex flex-col items-center gap-4 relative">
+             <motion.img 
+               animate={isBattling ? { x: [0, 10, 0] } : {}}
+               src={myUser.avatarUrl} 
+               className="w-24 h-24 rounded-full border-4 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] object-cover"
+             />
+             <div className="text-center">
+               <h3 className="font-bold text-emerald-100">{myUser.username}</h3>
+               <div className="w-32 h-2 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+                 <motion.div 
+                   animate={{ width: `${heroHp > 100 ? 100 : heroHp}%` }} 
+                   className="h-full bg-emerald-500 transition-all duration-300" 
+                 />
                </div>
-               <span className="text-[10px] text-zinc-500">{myStats.stats.classType}</span>
-            </div>
+             </div>
           </div>
 
-          {/* VS */}
           <div className="text-2xl font-black text-zinc-700 italic">VS</div>
 
-          {/* Rival (Direita) */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative grayscale hover:grayscale-0 transition-all">
-               <SpiritPet level={rival.level} xp={20} size="md" />
-            </div>
-            <div className="text-center">
-               <h3 className="font-bold text-red-400">{rival.name}</h3>
-               <div className="w-32 h-2 bg-zinc-800 rounded-full mt-1 overflow-hidden">
-                 <motion.div animate={{ width: `${(rivalHp / rival.stats.hp) * 100}%` }} className="h-full bg-red-500" />
+          {/* RIVAL REAL (DIREITA) */}
+          <div className="flex flex-col items-center gap-4 relative">
+             <motion.img 
+               animate={isBattling ? { x: [0, -10, 0] } : {}}
+               src={rivalUser.avatarUrl} 
+               className="w-24 h-24 rounded-full border-4 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)] object-cover"
+             />
+             <div className="text-center">
+               <h3 className="font-bold text-red-100">{rivalUser.username}</h3>
+               <div className="w-32 h-2 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+                 <motion.div 
+                   animate={{ width: `${rivalHp > 100 ? 100 : rivalHp}%` }} 
+                   className="h-full bg-red-500 transition-all duration-300" 
+                 />
                </div>
-               <span className="text-[10px] text-zinc-500">{rival.stats.classType}</span>
-            </div>
+             </div>
           </div>
         </div>
 
         {/* Controles & Log */}
         <div className="p-4 bg-zinc-950/50 border-t border-zinc-800 min-h-[150px] flex gap-4">
-           {/* Botões */}
-           <div className="flex flex-col gap-2 w-1/3">
-             {!winner ? (
-               <button onClick={playTurn} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
-                 <Zap size={18} /> ATACAR
+           {/* Botão de Ação */}
+           <div className="flex flex-col gap-2 w-1/3 justify-center">
+             {!winner && !isBattling && displayLogs.length === 0 && (
+               <button onClick={startBattle} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg animate-pulse">
+                 <Zap size={18} /> INICIAR
                </button>
-             ) : (
-               <div className="text-center">
-                 <p className="text-white font-bold mb-2">{winner === myStats.name ? "VICTORY!" : "DEFEAT..."}</p>
-                 <button onClick={onClose} className="w-full py-2 bg-zinc-800 text-white rounded-lg">Voltar</button>
+             )}
+             
+             {isBattling && (
+                <div className="text-center text-zinc-500 text-xs animate-pulse">
+                   Calculando Batalha...
+                </div>
+             )}
+
+             {winner && (
+               <div className="text-center animate-in zoom-in duration-300">
+                 <p className={`font-black text-xl mb-2 ${winner === myUser.id ? "text-yellow-400" : "text-red-500"}`}>
+                   {winner === myUser.id ? "VICTORY!" : "DEFEAT..."}
+                 </p>
+                 <button onClick={onClose} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm">
+                   Voltar
+                 </button>
                </div>
              )}
            </div>
 
            {/* Log de Combate */}
-           <div className="flex-1 bg-black/50 rounded-lg p-2 font-mono text-xs text-zinc-400 overflow-y-auto h-32 flex flex-col-reverse">
-             {battleLog.map((log, i) => (
-               <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="border-b border-white/5 py-1">
-                 {log}
+           <div className="flex-1 bg-black rounded-lg p-3 font-mono text-xs overflow-y-auto h-32 flex flex-col-reverse border border-zinc-800">
+             {displayLogs.length === 0 && !winner && <span className="text-zinc-600 italic">Aguardando início do protocolo...</span>}
+             
+             {[...displayLogs].reverse().map((log, i) => (
+               <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="mb-1">
+                 <span className={log.attacker === myUser.username ? "text-emerald-500 font-bold" : "text-red-500 font-bold"}>
+                   {log.attacker}
+                 </span>
+                 <span className="text-zinc-400">
+                    {log.action === "CRITICAL" ? " CRITICALLY hits for " : " attacks for "}
+                 </span>
+                 <span className="text-white font-bold">{log.damage} DMG</span>
                </motion.div>
              ))}
-             <div className="text-zinc-600 italic">Batalha iniciada...</div>
            </div>
         </div>
       </div>

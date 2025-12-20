@@ -5,3 +5,26 @@
 body {
   background-color: #050505; 
 }
+/* --- SCROLLBAR PERSONALIZADA --- */
+
+/* Largura da barra */
+::-webkit-scrollbar {
+  width: 6px;              
+  height: 6px;              
+}
+
+/* Fundo da barra (o trilho) */
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+/* A parte que você arrasta (o polegar) */
+::-webkit-scrollbar-thumb {
+  background: #27272a;     
+  border-radius: 10px;     
+}
+
+/* Quando passa o mouse em cima */
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;      
+}
