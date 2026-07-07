@@ -1,4 +1,4 @@
-# 👾 DevSpirit
+# DevSpirit
 
 > **Invoque, evolua e batalhe com o espírito digital do seu código.**
 
